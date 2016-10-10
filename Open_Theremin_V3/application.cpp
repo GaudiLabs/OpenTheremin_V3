@@ -12,6 +12,7 @@ const AppMode AppModeValues[] = {MUTE,NORMAL};
 const int16_t CalibrationTolerance = 15;
 const int16_t PitchFreqOffset = 700;
 const int16_t VolumeFreqOffset = 700;
+const int8_t HYST_VAL = 40;
 
 static int32_t pitchCalibrationBase = 0;
 static int32_t pitchCalibrationBaseFreq = 0;
@@ -162,7 +163,9 @@ void Application::loop() {
 
   uint16_t volumePotValue = 0;
   uint16_t pitchPotValue = 0;
-  uint16_t registerPotValue = 0;
+  int registerPotValue,registerPotValueL = 0;
+  int wavePotValue,wavePotValueL = 0;
+  uint8_t registerValue = 0;
 
 
 
@@ -170,10 +173,14 @@ void Application::loop() {
 
   pitchPotValue    = analogRead(PITCH_POT);
   volumePotValue   = analogRead(VOLUME_POT);
-  registerPotValue   = (analogRead(REGISTER_SELECT_POT)>>8)+1;
+  registerPotValue   = analogRead(REGISTER_SELECT_POT);
+  wavePotValue = analogRead(WAVE_SELECT_POT);
+  
+  if ((registerPotValue-registerPotValueL) >= HYST_VAL || (registerPotValueL-registerPotValue) >= HYST_VAL) registerPotValueL=registerPotValue;
+  if (((wavePotValue-wavePotValueL) >= HYST_VAL) || ((wavePotValueL-wavePotValue) >= HYST_VAL)) wavePotValueL=wavePotValue;
 
-  vWavetableSelector = analogRead(WAVE_SELECT_POT) >> 7;
-
+  vWavetableSelector=wavePotValueL>>7;
+  registerValue=4-(registerPotValueL>>8);  
 
   if (_state == PLAYING && HW_BUTTON_PRESSED) {
     _state = CALIBRATING;
@@ -224,7 +231,7 @@ void Application::loop() {
   OCR0A = pitch & 0xff;
 #endif
 
-#if SERIAL_ENABLED
+#if L_ENABLED
   if (timerExpired(TICKS_100_MILLIS)) {
     resetTimer();
     Serial.write(pitch & 0xff);              // Send char on serial (if used)
@@ -246,7 +253,7 @@ void Application::loop() {
     // set wave frequency for each mode
     switch (_mode) {
       case MUTE : /* NOTHING! */;                                        break;
-      case NORMAL      : setWavetableSampleAdvance((pitchCalibrationBase-pitch_v)/registerPotValue+2048-(pitchPotValue<<2)); break;
+      case NORMAL      : setWavetableSampleAdvance((pitchCalibrationBase-pitch_v)/registerValue+2048-(pitchPotValue<<2)); break;
     };
     
   //  HW_LED2_OFF;
