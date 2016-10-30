@@ -55,8 +55,8 @@ class Application {
     unsigned long GetQMeasurement();
 
 
-    static const float HZ_ADDVAL_FACTOR = 2.09785;
-    static const float MIDDLE_C = 261.6;
+    const float HZ_ADDVAL_FACTOR = 2.09785;
+    const float MIDDLE_C = 261.6;
 
     void playNote(float hz, uint16_t milliseconds, uint8_t volume);
     void hzToAddVal(float hz);

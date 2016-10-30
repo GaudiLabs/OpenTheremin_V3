@@ -34,6 +34,8 @@ inline bool timerUnexpiredMillis(uint16_t milliseconds) {
 void ticktimer (uint16_t ticks);
 void millitimer (uint16_t milliseconds);
 
+#if SERIAL_ENABLED
 const uint16_t TICKS_100_MILLIS = millisToTicks(100);
+#endif //SERIAL_ENABLED
 
 #endif // _TIMER_H

@@ -20,3 +20,9 @@ http://www.gaudi.ch/OpenTheremin/
 3. Selecting the correct usb port on Tools -> Serial Port
 4. Select the correct arduino board from Tools -> Board
 5. Upload the code by clicking on the upload button.
+
+### LICENSE
+Written by Urs Gaudenz, GaudiLabs, 2016
+GNU license, check LICENSE file for more information
+All text above must be included in any redistribution
+

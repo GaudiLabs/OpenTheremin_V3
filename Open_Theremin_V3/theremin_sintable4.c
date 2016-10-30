@@ -2,7 +2,7 @@
 
 #include <avr/pgmspace.h>
 
-const int16_t sine_table4[1024] PROGMEM = {\ 
+const int16_t sine_table4[1024] PROGMEM = {\
 
 0,
 3,

@@ -159,7 +159,6 @@ AppMode Application::nextMode() {
 void Application::loop() {
   int32_t pitch_v = 0, pitch_l = 0;            // Last value of pitch  (for filtering)
   int32_t vol_v = 0,   vol_l = 0;              // Last value of volume (for filtering)
-  int32_t pitch_f = 0;                        //  pitch in frequency (for filtering)
 
   uint16_t volumePotValue = 0;
   uint16_t pitchPotValue = 0;
@@ -231,7 +230,7 @@ void Application::loop() {
   OCR0A = pitch & 0xff;
 #endif
 
-#if L_ENABLED
+#if SERIAL_ENABLED
   if (timerExpired(TICKS_100_MILLIS)) {
     resetTimer();
     Serial.write(pitch & 0xff);              // Send char on serial (if used)
@@ -245,7 +244,6 @@ void Application::loop() {
     pitch_v=pitch_l+((pitch_v-pitch_l)>>2);
     pitch_l=pitch_v;
 
-    pitch_f=FREQ_FACTOR/pitch_v;
 
 //HW_LED2_ON;
 
