@@ -4,6 +4,8 @@
 #include "mcpDac.h"
 #include "timer.h"
 
+#include "build.h"
+
 #include "theremin_sintable.c"
 #include "theremin_sintable2.c"
 #include "theremin_sintable3.c"
@@ -24,7 +26,7 @@ const int16_t* const wavetables[] PROGMEM = {
   sine_table8
 };
 
-static const uint32_t MCP_DAC_BASE = 1748;
+static const uint32_t MCP_DAC_BASE = 2047;
 
 #define INT0_STATE    (PIND & (1<<PORTD2))
 #define PC_STATE      (PINB & (1<<PORTB0))
@@ -127,6 +129,13 @@ ISR (INT1_vect) {
   uint32_t scaledSample;
   uint16_t offset = (uint16_t)(pointer>>6) & 0x3ff;
 
+#if CV_ENABLED                                 // Generator for CV output
+
+ vPointerIncrement = min(vPointerIncrement, 4095);
+ mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
+
+#else   //Play sound
+
   // Read next wave table value (3.0us)
   // The slightly odd tactic here is to provide compile-time expressions for the wavetable
   // positions. Making addr1 the index into the wavtables array breaks the time limit for
@@ -143,14 +152,16 @@ ISR (INT1_vect) {
   };
 
   if (waveSample > 0) {                   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
-    scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 9);
+    scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 8);
   } else {
-    scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 9);
+    scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 8);
   }
 
   mcpDacSend(scaledSample);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
 
   pointer = pointer + vPointerIncrement;    // increment table pointer (ca. 2us)
+
+#endif                          //CV play sound
   incrementTimer();               // update 32us timer
 
   if (PC_STATE) debounce_p++;
