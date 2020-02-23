@@ -1,9 +1,9 @@
 ## Open.Theremin V3 control software 
 
 Arduino UNO Software for the Open.Theremin
-This is the "Academy edition" with improved volume control 
+- This is the "Academy edition" with improved volume control 
 - get both a more consistent response at low volumes and a dynamic range of up to 73.6dB
-a contribution by Thierry Frenkel. 
+- a contribution by Thierry Frenkel. 
 
 ### Don't click on the files!
 Click on the "Download ZIP" Button to the right or [Click here](https://github.com/GaudiLabs/OpenTheremin_V3/archive/master.zip) 
