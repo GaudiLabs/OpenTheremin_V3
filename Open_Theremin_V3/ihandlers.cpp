@@ -117,6 +117,50 @@ static inline uint32_t mul_16_8(uint16_t a, uint8_t b)
   return product;
 }
 
+/* 
+ *  - "exponentiate" and expand the 8bit volume value to 16 bit
+ *  - do a 16x16_32 multiplication of the signed!!! sample with the unsigned exp_vol value
+ *    (get rid of the ugly if/then depending on the sample sign in the previous release)
+ *  - add the DAC offset and 1/S LSB as rounding helper before truncating down to 16bit
+ *    (get rid of the 8bit right shift in the previous release which eats up 8 cycles on AVR)
+ *  - Contributed by Thierry Frenkel 2020
+ */
+static inline uint16_t volexp(int16_t samp, uint8_t vol) {
+  uint16_t res;
+  uint32_t tmp;
+  const uint32_t cor = 0x08008000;
+  asm ( 
+    "clr r2 \n"
+    "mul %2, %2 \n"       // square volume value
+    "add r0, %2 \n"       // add volume value twice to the square
+    "adc r1, r2 \n"       // to get x -> x^2 + 2x
+    "add r0, %2 \n"       // which is an approxmimative
+    "adc r1, r2 \n"       // exponential response
+    "movw %0, r0 \n"      // and store it as a 16bit value
+    "mulsu %B3, %B0 \n"   // multiply it with the signed(!) 16bit sample (samp_h x vol_h)
+    "movw %C1, r0 \n"     // move and/or add all 4 partial results into the 32bit tmp
+    "mul %A3, %A0 \n"     // (samp_l x vol_l) unsigned
+    "movw %A1, r0 \n"     
+    "mulsu %B3, %A0 \n"   // (samp_h x vol_l) signed
+    "sbc %D1, r2 \n"
+    "add %B1, r0 \n"
+    "adc %C1, r1 \n"
+    "adc %D1, r2 \n"
+    "mul %A3, %B0 \n"     // (samp_l x vol_h) unsigned
+    "add %B1, r0 \n"
+    "adc %C1, r1 \n"
+    "adc %D1, r2 \n"    
+    "add %B1, %B4 \n"      // add 1/2 LSB before truncating
+    "adc %C1, %C4 \n"      // which is like rounding
+    "adc %D1, %D4 \n"      // and the DAC offset
+    "movw %0, %C1 \n"
+    "clr r1 \n"
+    : "+a" (res), "+a" (tmp)
+    : "r" (vol), "a" (samp), "r" (cor)
+    );
+  return res;
+}
+
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
   // Interrupt takes up a total of max 25 us
@@ -151,12 +195,16 @@ ISR (INT1_vect) {
     default: waveSample = (int16_t) pgm_read_word_near(wavetables[0] + offset); break;
   };
 
-  if (waveSample > 0) {                   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
-    scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 8);
-  } else {
-    scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 8);
-  }
+/*
+ * obsolete, see comments above volexp() function definition
+ * if (waveSample > 0) {                   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
+ *   scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 8);
+ * } else {
+ *   scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 8);
+ * }
+*/
 
+  scaledSample = volexp(waveSample, vScaledVolume);
   mcpDacSend(scaledSample);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
 
   pointer = pointer + vPointerIncrement;    // increment table pointer (ca. 2us)
@@ -216,5 +264,3 @@ ISR(TIMER1_OVF_vect)
 {
   timer_overflow_counter++;
 }
-
-
