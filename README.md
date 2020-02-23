@@ -6,7 +6,7 @@ Arduino UNO Software for the Open.Theremin
 - a contribution by Thierry Frenkel. 
 
 ### Don't click on the files!
-Click on the "Download ZIP" Button to the right or [Click here](https://github.com/GaudiLabs/OpenTheremin_V3/archive/master.zip) 
+Click on the "Download ZIP" Button to the right or [Click here](https://github.com/Theremingenieur/OpenTheremin_V3/archive/master.zip) 
 Then unpack the archive.
 
 ### Open Source Theremin based on the Arduino Platform
