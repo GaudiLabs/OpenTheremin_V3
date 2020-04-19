@@ -1,6 +1,14 @@
-## Open.Theremin V3 control software 
+## Open.Theremin V3.1 control software
 
 Arduino UNO Software for the Open.Theremin
+
+### Changes since V3.0 (all by @Theremingenieur):
+1. Fix a wavetable addressing issue (found by @michaelfreitas)
+2. Use the Arduino's hardware SPI to control the DACS and use the Latch signal to reduce audio jitter
+3. Improve the register switch to transpose by clean octaves and keep the tone spacing and pitch tuning consistent
+4. Improve the volume response to give a smoother start and wider dynamics (*)
+
+(*) This relies on a recent gcc compiler version. Make sure to compile it with the Arduino IDE >= 1.8.10
 
 ### Don't click on the files!
 Click on the "Download ZIP" Button to the right or [Click here](https://github.com/GaudiLabs/OpenTheremin_V3/archive/master.zip) 
