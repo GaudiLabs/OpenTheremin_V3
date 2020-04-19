@@ -25,7 +25,7 @@ const int16_t* const wavetables[] = { //Fixed following a suggestion by Michael 
   sine_table8
 };
 
-static const uint32_t MCP_DAC_BASE = 2047;
+static const uint32_t MCP_DAC_BASE = 2048;
 
 #define INT0_STATE    (PIND & (1<<PORTD2))
 #define PC_STATE      (PINB & (1<<PORTB0))
@@ -38,7 +38,7 @@ static const uint32_t MCP_DAC_BASE = 2047;
 #include "hw.h"
 #endif
 
-volatile uint8_t  vScaledVolume = 0;
+volatile uint16_t vScaledVolume = 0;
 volatile uint16_t vPointerIncrement = 0;
 
 volatile uint16_t pitch = 0;            // Pitch value
@@ -104,29 +104,13 @@ void ihInitialiseVolumeMeasurement() //Measurement of variable frequency oscilla
     
   }
 
-/* signed 16 bit by 8 bit multiplication */
-static inline uint32_t mulsu_16_8(uint16_t a, uint8_t b)
-{
-  uint32_t product;
-  asm (
-    "mul %A1, %2\n\t"
-    "movw %A0, r0\n\t"
-    "clr %C0\n\t"
-    "clr %D0\n\t"
-    "mulsu %B1, %2\n\t"
-    "add %B0, r0\n\t"
-    "adc %C0, r1\n\t"
-    "clr r1"
-    :
-    "=&r" (product)
-    :
-    "r" (a), "r" (b));
-  return product;
-}
-
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
-  // Interrupt takes up a total of 14us plus overhead when interrupted itself.
+  // Interrupt takes up a total of 16us plus overhead when interrupted itself.
+// Added by ThF 20200419
+#ifdef TH_DEBUG
+	HW_LED2_ON;
+#endif
 
 	// Latch previously written DAC value:
 	SPImcpDAClatch();
@@ -136,7 +120,7 @@ ISR (INT1_vect) {
 	interrupts();
 
 	int16_t waveSample;
-	uint32_t scaledSample;
+	uint32_t scaledSample = 0;
 	uint16_t offset = (uint16_t)(pointer >> 6) & 0x3ff;
 
 #if CV_ENABLED                                 // Generator for CV output
@@ -146,25 +130,14 @@ ISR (INT1_vect) {
 
 #else   //Play sound
 
-  // Read next wave table value
-  waveSample = (int16_t)pgm_read_word_near(wavetables[vWavetableSelector] + offset);
+	// Read next wave table value
+	waveSample = (int16_t)pgm_read_word_near(wavetables[vWavetableSelector] + offset);
 
-  // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
-  scaledSample = MCP_DAC_BASE + (mulsu_16_8(waveSample, vScaledVolume) >> 8);
+	scaledSample = ((int32_t)waveSample * (uint32_t)vScaledVolume) >> 16;
 
-// Added by ThF 20200419
-#ifdef TH_DEBUG
-	HW_LED2_ON;
-#endif
+	SPImcpDACsend(scaledSample + MCP_DAC_BASE); //Send result to Digital to Analogue Converter (audio out) (6 us)
 
-	SPImcpDACsend(scaledSample); //Send result to Digital to Analogue Converter (audio out) (6 us)
-
-// Added by ThF 20200419
-#ifdef TH_DEBUG
-	HW_LED2_OFF;
-#endif
-
-	pointer = pointer + vPointerIncrement; // increment table pointer (ca. 2us)
+	pointer += vPointerIncrement; // increment table pointer (ca. 2us)
 
 #endif                          //CV play sound
   incrementTimer();               // update 32us timer
@@ -195,6 +168,10 @@ ISR (INT1_vect) {
 
   noInterrupts();
   enableInt1();
+// Added by ThF 20200419
+#ifdef TH_DEBUG
+	HW_LED2_OFF;
+#endif
 }
 
 /* VOLUME read - interrupt service routine for capturing volume counter value */
@@ -221,5 +198,3 @@ ISR(TIMER1_OVF_vect)
 {
   timer_overflow_counter++;
 }
-
-

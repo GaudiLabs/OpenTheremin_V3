@@ -82,7 +82,7 @@ unsigned long Application::GetQMeasurement()
 {
   int qn=0;
   
-  TCCR1B = (1<<CS10);  
+  TCCR1B = (1<<CS10);	
 
 while(!(PIND & (1<<PORTD3)));
 while((PIND & (1<<PORTD3)));
@@ -97,7 +97,7 @@ while((PIND & (1<<PORTD3)));
 
  
   
-  TCCR1B = 0; 
+  TCCR1B = 0;	
 
  unsigned long frequency = TCNT1;
  unsigned long temp = 65536*(unsigned long)timer_overflow_counter;
@@ -112,11 +112,11 @@ unsigned long Application::GetPitchMeasurement()
 {
   TCNT1 = 0;
   timer_overflow_counter = 0;
-  TCCR1B = (1<<CS12) | (1<<CS11) | (1<<CS10); 
+  TCCR1B = (1<<CS12) | (1<<CS11) | (1<<CS10);	
 
   delay(1000);  
   
-  TCCR1B = 0; 
+  TCCR1B = 0;	
 
  unsigned long frequency = TCNT1;
  unsigned long temp = 65536*(unsigned long)timer_overflow_counter;
@@ -131,11 +131,11 @@ unsigned long Application::GetVolumeMeasurement()
 
   TCNT0=0;
   TCNT1=49911;
-  TCCR0B = (1<<CS02) | (1<<CS01) | (1<<CS00);  // //External clock source on T0 pin. Clock on rising edge.
+  TCCR0B = (1<<CS02) | (1<<CS01) | (1<<CS00);	 // //External clock source on T0 pin. Clock on rising edge.
   TIFR1  = (1<<TOV1);        //Timer1 INT Flag Reg: Clear Timer Overflow Flag
 
 while(!(TIFR1&((1<<TOV1)))); // on Timer 1 overflow (1s)
-  TCCR0B = 0;  // Stop TimerCounter 0
+  TCCR0B = 0;	 // Stop TimerCounter 0
  unsigned long frequency = TCNT0; // get counter 0 value
  unsigned long temp = (unsigned long)timer_overflow_counter; // and overflow counter
 
@@ -165,8 +165,7 @@ void Application::loop() {
   int registerPotValue,registerPotValueL = 0;
   int wavePotValue,wavePotValueL = 0;
   uint8_t registerValue = 2;
-
-
+  uint16_t tmpVolume;
 
   mloop:                   // Main loop avoiding the GCC "optimization"
 
@@ -182,15 +181,15 @@ void Application::loop() {
 
   // New register pot configuration:
   // Left = -1 octave, Center = +/- 0, Right = +1 octave
-  if(registerPotValue > 681) 
+  if (registerPotValue > 681)
   {
-    registerValue = 1;
+	  registerValue = 1;
   } else if(registerPotValue < 342)
   {
-    registerValue = 3;
+	  registerValue = 3;
   } else 
   {
-    registerValue = 2;
+	  registerValue = 2;
   }
 
   if (_state == PLAYING && HW_BUTTON_PRESSED) {
@@ -288,9 +287,12 @@ void Application::loop() {
     //    vol_v = vol_v - (1 + MAX_VOLUME - (volumePotValue << 2));
     vol_v = vol_v ;
     vol_v = max(vol_v, 0);
-    vScaledVolume = vol_v >> 4;
+    tmpVolume = vol_v >> 4;
+	
+	// Give vScaledVolume a pseudo-exponential characteristic:
+	vScaledVolume = tmpVolume * (tmpVolume + 2);
 
-    volumeValueAvailable = false;
+	volumeValueAvailable = false;
   }
 
   goto mloop;                           // End of main loop
@@ -494,7 +496,7 @@ void Application::hzToAddVal(float hz) {
 }
 
 void Application::playNote(float hz, uint16_t milliseconds = 500, uint8_t volume = 255) {
-  vScaledVolume = volume;
+  vScaledVolume = volume * (volume + 2);
   hzToAddVal(hz);
   millitimer(milliseconds);
   vScaledVolume = 0;
