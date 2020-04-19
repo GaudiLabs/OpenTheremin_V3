@@ -3,7 +3,7 @@
 #include "application.h"
 
 #include "hw.h"
-#include "SPImcpDAC.h"
+#include "mcpDac.h"
 #include "ihandlers.h"
 #include "timer.h"
 #include "EEPROM.h"
@@ -42,13 +42,13 @@ void Application::setup() {
 
   digitalWrite(Application::LED_PIN_1, HIGH);    // turn the LED off by making the voltage LOW
 
-   SPImcpDACinit();
+   mcpDacInit();
 
 EEPROM.get(0,pitchDAC);
 EEPROM.get(2,volumeDAC);
 
-SPImcpDAC2Asend(pitchDAC);
-SPImcpDAC2Bsend(volumeDAC);
+mcpDac2ASend(pitchDAC);
+mcpDac2BSend(volumeDAC);
 
   
 initialiseTimer();
@@ -327,7 +327,7 @@ static long pitchfn = 0;
   
   InitialisePitchMeasurement();
   interrupts();
-  SPImcpDACinit();
+  mcpDacInit();
 
   qMeasurement = GetQMeasurement();  // Measure Arudino clock frequency 
   Serial.print("Arudino Freq: ");
@@ -344,13 +344,13 @@ Serial.print("\nPitch Set Frequency: ");
 Serial.println(pitchfn);
 
 
-SPImcpDAC2Bsend(1600);
+mcpDac2BSend(1600);
 
-SPImcpDAC2Asend(pitchXn0);
+mcpDac2ASend(pitchXn0);
 delay(100);
 pitchfn0 = GetPitchMeasurement();
 
-SPImcpDAC2Asend(pitchXn1);
+mcpDac2ASend(pitchXn1);
 delay(100);
 pitchfn1 = GetPitchMeasurement();
 
@@ -362,11 +362,11 @@ Serial.println(pitchfn1);
  
 while(abs(pitchfn0-pitchfn1)>CalibrationTolerance){      // max allowed pitch frequency offset
 
-SPImcpDAC2Asend(pitchXn0);
+mcpDac2ASend(pitchXn0);
 delay(100);
 pitchfn0 = GetPitchMeasurement()-pitchfn;
 
-SPImcpDAC2Asend(pitchXn1);
+mcpDac2ASend(pitchXn1);
 delay(100);
 pitchfn1 = GetPitchMeasurement()-pitchfn;
 
@@ -411,7 +411,7 @@ static long volumefn = 0;
     
   InitialiseVolumeMeasurement();
   interrupts();
-  SPImcpDACinit();
+  mcpDacInit();
 
 
 volumeXn0 = 0;
@@ -424,12 +424,12 @@ Serial.print("\nVolume Set Frequency: ");
 Serial.println(volumefn);
 
 
-SPImcpDAC2Bsend(volumeXn0);
+mcpDac2BSend(volumeXn0);
 delay_NOP(44316);//44316=100ms
 
 volumefn0 = GetVolumeMeasurement();
 
-SPImcpDAC2Bsend(volumeXn1);
+mcpDac2BSend(volumeXn1);
 
 delay_NOP(44316);//44316=100ms
 volumefn1 = GetVolumeMeasurement();
@@ -443,11 +443,11 @@ Serial.println(volumefn1);
 
 while(abs(volumefn0-volumefn1)>CalibrationTolerance){
 
-SPImcpDAC2Bsend(volumeXn0);
+mcpDac2BSend(volumeXn0);
 delay_NOP(44316);//44316=100ms
 volumefn0 = GetVolumeMeasurement()-volumefn;
 
-SPImcpDAC2Bsend(volumeXn1);
+mcpDac2BSend(volumeXn1);
 delay_NOP(44316);//44316=100ms
 volumefn1 = GetVolumeMeasurement()-volumefn;
 
@@ -474,7 +474,7 @@ EEPROM.put(2,volumeXn0);
   HW_LED2_OFF;
   HW_LED1_ON;
 
-  Serial.println("\nCALIBRATION COMPLETED\n");
+  Serial.println("\nCALIBRATION COMPTLETED\n");
 }
 
 void Application::hzToAddVal(float hz) {
@@ -512,3 +512,7 @@ void Application::delay_NOP(unsigned long time) {
       __asm__ __volatile__ ("nop");
   }
 }
+
+
+
+
