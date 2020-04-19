@@ -82,7 +82,7 @@ unsigned long Application::GetQMeasurement()
 {
   int qn=0;
   
-  TCCR1B = (1<<CS10);	
+  TCCR1B = (1<<CS10);  
 
 while(!(PIND & (1<<PORTD3)));
 while((PIND & (1<<PORTD3)));
@@ -97,7 +97,7 @@ while((PIND & (1<<PORTD3)));
 
  
   
-  TCCR1B = 0;	
+  TCCR1B = 0; 
 
  unsigned long frequency = TCNT1;
  unsigned long temp = 65536*(unsigned long)timer_overflow_counter;
@@ -112,11 +112,11 @@ unsigned long Application::GetPitchMeasurement()
 {
   TCNT1 = 0;
   timer_overflow_counter = 0;
-  TCCR1B = (1<<CS12) | (1<<CS11) | (1<<CS10);	
+  TCCR1B = (1<<CS12) | (1<<CS11) | (1<<CS10); 
 
   delay(1000);  
   
-  TCCR1B = 0;	
+  TCCR1B = 0; 
 
  unsigned long frequency = TCNT1;
  unsigned long temp = 65536*(unsigned long)timer_overflow_counter;
@@ -131,11 +131,11 @@ unsigned long Application::GetVolumeMeasurement()
 
   TCNT0=0;
   TCNT1=49911;
-  TCCR0B = (1<<CS02) | (1<<CS01) | (1<<CS00);	 // //External clock source on T0 pin. Clock on rising edge.
+  TCCR0B = (1<<CS02) | (1<<CS01) | (1<<CS00);  // //External clock source on T0 pin. Clock on rising edge.
   TIFR1  = (1<<TOV1);        //Timer1 INT Flag Reg: Clear Timer Overflow Flag
 
 while(!(TIFR1&((1<<TOV1)))); // on Timer 1 overflow (1s)
-  TCCR0B = 0;	 // Stop TimerCounter 0
+  TCCR0B = 0;  // Stop TimerCounter 0
  unsigned long frequency = TCNT0; // get counter 0 value
  unsigned long temp = (unsigned long)timer_overflow_counter; // and overflow counter
 
@@ -164,7 +164,7 @@ void Application::loop() {
   uint16_t pitchPotValue = 0;
   int registerPotValue,registerPotValueL = 0;
   int wavePotValue,wavePotValueL = 0;
-  uint8_t registerValue = 0;
+  uint8_t registerValue = 2;
 
 
 
@@ -179,7 +179,19 @@ void Application::loop() {
   if (((wavePotValue-wavePotValueL) >= HYST_VAL) || ((wavePotValueL-wavePotValue) >= HYST_VAL)) wavePotValueL=wavePotValue;
 
   vWavetableSelector=wavePotValueL>>7;
-  registerValue=4-(registerPotValueL>>8);  
+
+  // New register pot configuration:
+  // Left = -1 octave, Center = +/- 0, Right = +1 octave
+  if(registerPotValue > 681) 
+  {
+    registerValue = 1;
+  } else if(registerPotValue < 342)
+  {
+    registerValue = 3;
+  } else 
+  {
+    registerValue = 2;
+  }
 
   if (_state == PLAYING && HW_BUTTON_PRESSED) {
     _state = CALIBRATING;
@@ -251,7 +263,7 @@ void Application::loop() {
     // set wave frequency for each mode
     switch (_mode) {
       case MUTE : /* NOTHING! */;                                        break;
-      case NORMAL      : setWavetableSampleAdvance((pitchCalibrationBase-pitch_v)/registerValue+2048-(pitchPotValue<<2)); break;
+      case NORMAL      : setWavetableSampleAdvance(((pitchCalibrationBase-pitch_v)+2048-(pitchPotValue<<2))>>registerValue); break;
     };
     
   //  HW_LED2_OFF;
@@ -512,7 +524,3 @@ void Application::delay_NOP(unsigned long time) {
       __asm__ __volatile__ ("nop");
   }
 }
-
-
-
-
