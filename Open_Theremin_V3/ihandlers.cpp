@@ -1,7 +1,7 @@
 #include "Arduino.h"
 
 #include "ihandlers.h"
-#include "mcpDac.h"
+#include "SPImcpDAC.h"
 #include "timer.h"
 #include "build.h"
 
@@ -126,12 +126,10 @@ static inline uint32_t mulsu_16_8(uint16_t a, uint8_t b)
 
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
-  // Interrupt takes up a total of max 25 us
-  
-  // Added by ThF 20200419
-  #ifdef TH_DEBUG
-    HW_LED2_ON;
-  #endif
+  // Interrupt takes up a total of 14us plus overhead when interrupted itself.
+
+	// Latch previously written DAC value:
+	SPImcpDAClatch();
 
 	disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
 	// Enable Interrupts to allow counter 1 interrupts
@@ -154,9 +152,19 @@ ISR (INT1_vect) {
   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
   scaledSample = MCP_DAC_BASE + (mulsu_16_8(waveSample, vScaledVolume) >> 8);
 
-  mcpDacSend(scaledSample);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
+// Added by ThF 20200419
+#ifdef TH_DEBUG
+	HW_LED2_ON;
+#endif
 
-  pointer = pointer + vPointerIncrement;    // increment table pointer (ca. 2us)
+	SPImcpDACsend(scaledSample); //Send result to Digital to Analogue Converter (audio out) (6 us)
+
+// Added by ThF 20200419
+#ifdef TH_DEBUG
+	HW_LED2_OFF;
+#endif
+
+	pointer = pointer + vPointerIncrement; // increment table pointer (ca. 2us)
 
 #endif                          //CV play sound
   incrementTimer();               // update 32us timer
@@ -187,11 +195,6 @@ ISR (INT1_vect) {
 
   noInterrupts();
   enableInt1();
-
-  // Added by ThF 20200419
-  #ifdef TH_DEBUG
-	HW_LED2_OFF;
-#endif
 }
 
 /* VOLUME read - interrupt service routine for capturing volume counter value */
@@ -218,3 +221,5 @@ ISR(TIMER1_OVF_vect)
 {
   timer_overflow_counter++;
 }
+
+
