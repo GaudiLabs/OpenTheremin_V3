@@ -3,7 +3,6 @@
 #include "ihandlers.h"
 #include "mcpDac.h"
 #include "timer.h"
-
 #include "build.h"
 
 #include "theremin_sintable.c"
@@ -15,7 +14,7 @@
 #include "theremin_sintable7.c"
 #include "theremin_sintable8.c"
 
-const int16_t* const wavetables[] PROGMEM = {
+const int16_t* const wavetables[] = { //Fixed following a suggestion by Michael Freitas, does not need to be in PROGMEM
   sine_table,
   sine_table2,
   sine_table3,
@@ -30,6 +29,14 @@ static const uint32_t MCP_DAC_BASE = 2047;
 
 #define INT0_STATE    (PIND & (1<<PORTD2))
 #define PC_STATE      (PINB & (1<<PORTB0))
+
+// Added by ThF 20200419
+// #define TH_DEBUG 			// <-- comment this out for normal operation
+// end
+
+#ifdef TH_DEBUG
+#include "hw.h"
+#endif
 
 volatile uint8_t  vScaledVolume = 0;
 volatile uint16_t vPointerIncrement = 0;
@@ -97,8 +104,8 @@ void ihInitialiseVolumeMeasurement() //Measurement of variable frequency oscilla
     
   }
 
-/* 16 bit by 8 bit multiplication */
-static inline uint32_t mul_16_8(uint16_t a, uint8_t b)
+/* signed 16 bit by 8 bit multiplication */
+static inline uint32_t mulsu_16_8(uint16_t a, uint8_t b)
 {
   uint32_t product;
   asm (
@@ -106,7 +113,7 @@ static inline uint32_t mul_16_8(uint16_t a, uint8_t b)
     "movw %A0, r0\n\t"
     "clr %C0\n\t"
     "clr %D0\n\t"
-    "mul %B1, %2\n\t"
+    "mulsu %B1, %2\n\t"
     "add %B0, r0\n\t"
     "adc %C0, r1\n\t"
     "clr r1"
@@ -120,14 +127,19 @@ static inline uint32_t mul_16_8(uint16_t a, uint8_t b)
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
   // Interrupt takes up a total of max 25 us
+  
+  // Added by ThF 20200419
+  #ifdef TH_DEBUG
+    HW_LED2_ON;
+  #endif
 
-  disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
-  // Enable Interrupts to allow counter 1 interrupts
-  interrupts();
+	disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
+	// Enable Interrupts to allow counter 1 interrupts
+	interrupts();
 
-  int16_t  waveSample;
-  uint32_t scaledSample;
-  uint16_t offset = (uint16_t)(pointer>>6) & 0x3ff;
+	int16_t waveSample;
+	uint32_t scaledSample;
+	uint16_t offset = (uint16_t)(pointer >> 6) & 0x3ff;
 
 #if CV_ENABLED                                 // Generator for CV output
 
@@ -136,26 +148,11 @@ ISR (INT1_vect) {
 
 #else   //Play sound
 
-  // Read next wave table value (3.0us)
-  // The slightly odd tactic here is to provide compile-time expressions for the wavetable
-  // positions. Making addr1 the index into the wavtables array breaks the time limit for
-  // the interrupt handler
-  switch (vWavetableSelector) {
-    case 1:  waveSample = (int16_t) pgm_read_word_near(wavetables[1] + offset); break;
-    case 2:  waveSample = (int16_t) pgm_read_word_near(wavetables[2] + offset); break;
-    case 3:  waveSample = (int16_t) pgm_read_word_near(wavetables[3] + offset); break;
-    case 4:  waveSample = (int16_t) pgm_read_word_near(wavetables[4] + offset); break;
-    case 5:  waveSample = (int16_t) pgm_read_word_near(wavetables[5] + offset); break;
-    case 6:  waveSample = (int16_t) pgm_read_word_near(wavetables[6] + offset); break;
-    case 7:  waveSample = (int16_t) pgm_read_word_near(wavetables[7] + offset); break;
-    default: waveSample = (int16_t) pgm_read_word_near(wavetables[0] + offset); break;
-  };
+  // Read next wave table value
+  waveSample = (int16_t)pgm_read_word_near(wavetables[vWavetableSelector] + offset);
 
-  if (waveSample > 0) {                   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
-    scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 8);
-  } else {
-    scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 8);
-  }
+  // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
+  scaledSample = MCP_DAC_BASE + (mulsu_16_8(waveSample, vScaledVolume) >> 8);
 
   mcpDacSend(scaledSample);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
 
@@ -190,6 +187,11 @@ ISR (INT1_vect) {
 
   noInterrupts();
   enableInt1();
+
+  // Added by ThF 20200419
+  #ifdef TH_DEBUG
+	HW_LED2_OFF;
+#endif
 }
 
 /* VOLUME read - interrupt service routine for capturing volume counter value */
@@ -216,5 +218,3 @@ ISR(TIMER1_OVF_vect)
 {
   timer_overflow_counter++;
 }
-
-
