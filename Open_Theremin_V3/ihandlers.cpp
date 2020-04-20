@@ -106,14 +106,15 @@ void ihInitialiseVolumeMeasurement() //Measurement of variable frequency oscilla
 
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
-  // Interrupt takes up a total of 16us plus overhead when interrupted itself.
-// Added by ThF 20200419
-#ifdef TH_DEBUG
-	HW_LED2_ON;
-#endif
+  // Interrupt takes up normally 14us but can take up to 22us when interrupted by another interrupt.
 
-	// Latch previously written DAC value:
-	SPImcpDAClatch();
+  // Added by ThF 20200419
+  #ifdef TH_DEBUG
+    HW_LED2_ON;
+  #endif
+
+  // Latch previously written DAC value:
+  SPImcpDAClatch();
 
 	disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
 	// Enable Interrupts to allow counter 1 interrupts
@@ -126,18 +127,18 @@ ISR (INT1_vect) {
 #if CV_ENABLED                                 // Generator for CV output
 
  vPointerIncrement = min(vPointerIncrement, 4095);
- mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
+ mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (5.5 us)
 
 #else   //Play sound
 
 	// Read next wave table value
 	waveSample = (int16_t)pgm_read_word_near(wavetables[vWavetableSelector] + offset);
 
-	scaledSample = ((int32_t)waveSample * (uint32_t)vScaledVolume) >> 16;
+	scaledSample = ((int32_t)waveSample * (uint32_t)vScaledVolume) >> 16; // The compiler optimizes this better than any assembly written by hand !!!
 
-	SPImcpDACsend(scaledSample + MCP_DAC_BASE); //Send result to Digital to Analogue Converter (audio out) (6 us)
+	SPImcpDACsend(scaledSample + MCP_DAC_BASE); //Send result to Digital to Analogue Converter (audio out) (5.5 us)
 
-	pointer += vPointerIncrement; // increment table pointer (ca. 2us)
+	pointer += vPointerIncrement; // increment table pointer
 
 #endif                          //CV play sound
   incrementTimer();               // update 32us timer

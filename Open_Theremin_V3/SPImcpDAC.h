@@ -45,18 +45,20 @@ static inline void SPImcpDACinit()
 	HW_SPI_DDR |= _BV(HW_SPI_MOSI_BIT);
 	// initialize the hardware SPI registers
 	SPCR = _BV(SPE) | _BV(MSTR);	// no interrupt, SPI enable, MSB first, SPI master, SPI mode 0, clock = f_osc/4 (maximum)
-	SPSR |= SPI2X;					// double the SPI clock, ideally we get 8 MHz, so that a 16bit word goes out in 2us plus only a small overhead
+	SPSR = _BV(SPI2X);  // double the SPI clock, ideally we get 8 MHz, so that a 16bit word goes out in 3.5us (5.6us when called from an interrupt) including CS asserting/deasserting
 }
 
 static inline void SPImcpDACtransmit(uint16_t data)
 {
 	// Send highbyte and wait for complete
 	SPDR = highByte(data);
-	while (!(SPSR && _BV(SPIF)))
+  asm("nop");
+	while (!(SPSR & _BV(SPIF)))
 		;
 	// Send lowbyte and wait for complete
 	SPDR = lowByte(data);
-	while (!(SPSR && _BV(SPIF)))
+  asm("nop");
+	while (!(SPSR & _BV(SPIF)))
 		;
 }
 
@@ -69,12 +71,12 @@ static inline void SPImcpDAClatch()
 static inline void SPImcpDACsend(uint16_t data)
 {
 	MCP_DAC_CS_PORT &= ~_BV(MCP_DAC_CS_BIT);
-	// Sanitize input data and add DAC config MSBs
-	data &= 0x0FFF;
-	data |= 0x7000;
+  // Sanitize input data and add DAC config MSBs
+  data &= 0x0FFF;
+  data |= 0x7000;
 	SPImcpDACtransmit(data);
 	MCP_DAC_CS_PORT |= _BV(MCP_DAC_CS_BIT);
-	// Do not latch immpediately, let's do it at the beginning of the next interrupt to get consistent timing
+	// Do not latch immpediately, let's do it at the very beginning of the next interrupt to get consistent timing
 }
 
 static inline void SPImcpDAC2Asend(uint16_t data)
