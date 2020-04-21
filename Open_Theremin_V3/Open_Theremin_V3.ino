@@ -1,7 +1,7 @@
 /*
  *  Open.Theremin control software for Arduino UNO
- *  Version 3.0
- *  Copyright (C) 2010-2016 by Urs Gaudenz
+ *  Version 3.1
+ *  Copyright (C) 2010-2020 by Urs Gaudenz
  *
  *  Open.Theremin control software is free software: you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License as published
@@ -19,6 +19,7 @@
  *  With important contributions by 
  *  David Harvey
  *  Michael Margolis
+ *  "Theremingenieur" Thierry Frenkel
  */
  
 /**
@@ -76,4 +77,3 @@ void setup() {
 void loop() {
   app.loop();
 }
-

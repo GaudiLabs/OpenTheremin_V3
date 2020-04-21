@@ -3,7 +3,7 @@
 #include "application.h"
 
 #include "hw.h"
-#include "mcpDac.h"
+#include "SPImcpDAC.h"
 #include "ihandlers.h"
 #include "timer.h"
 #include "EEPROM.h"
@@ -42,13 +42,13 @@ void Application::setup() {
 
   digitalWrite(Application::LED_PIN_1, HIGH);    // turn the LED off by making the voltage LOW
 
-   mcpDacInit();
+   SPImcpDACinit();
 
 EEPROM.get(0,pitchDAC);
 EEPROM.get(2,volumeDAC);
 
-mcpDac2ASend(pitchDAC);
-mcpDac2BSend(volumeDAC);
+SPImcpDAC2Asend(pitchDAC);
+SPImcpDAC2Bsend(volumeDAC);
 
   
 initialiseTimer();
@@ -164,9 +164,8 @@ void Application::loop() {
   uint16_t pitchPotValue = 0;
   int registerPotValue,registerPotValueL = 0;
   int wavePotValue,wavePotValueL = 0;
-  uint8_t registerValue = 0;
-
-
+  uint8_t registerValue = 2;
+  uint16_t tmpVolume;
 
   mloop:                   // Main loop avoiding the GCC "optimization"
 
@@ -179,7 +178,19 @@ void Application::loop() {
   if (((wavePotValue-wavePotValueL) >= HYST_VAL) || ((wavePotValueL-wavePotValue) >= HYST_VAL)) wavePotValueL=wavePotValue;
 
   vWavetableSelector=wavePotValueL>>7;
-  registerValue=4-(registerPotValueL>>8);  
+
+  // New register pot configuration:
+  // Left = -1 octave, Center = +/- 0, Right = +1 octave
+  if (registerPotValue > 681)
+  {
+	  registerValue = 1;
+  } else if(registerPotValue < 342)
+  {
+	  registerValue = 3;
+  } else 
+  {
+	  registerValue = 2;
+  }
 
   if (_state == PLAYING && HW_BUTTON_PRESSED) {
     _state = CALIBRATING;
@@ -251,7 +262,7 @@ void Application::loop() {
     // set wave frequency for each mode
     switch (_mode) {
       case MUTE : /* NOTHING! */;                                        break;
-      case NORMAL      : setWavetableSampleAdvance((pitchCalibrationBase-pitch_v)/registerValue+2048-(pitchPotValue<<2)); break;
+      case NORMAL      : setWavetableSampleAdvance(((pitchCalibrationBase-pitch_v)+2048-(pitchPotValue<<2))>>registerValue); break;
     };
     
   //  HW_LED2_OFF;
@@ -276,9 +287,12 @@ void Application::loop() {
     //    vol_v = vol_v - (1 + MAX_VOLUME - (volumePotValue << 2));
     vol_v = vol_v ;
     vol_v = max(vol_v, 0);
-    vScaledVolume = vol_v >> 4;
+    tmpVolume = vol_v >> 4;
+	
+	// Give vScaledVolume a pseudo-exponential characteristic:
+	vScaledVolume = tmpVolume * (tmpVolume + 2);
 
-    volumeValueAvailable = false;
+	volumeValueAvailable = false;
   }
 
   goto mloop;                           // End of main loop
@@ -327,7 +341,7 @@ static long pitchfn = 0;
   
   InitialisePitchMeasurement();
   interrupts();
-  mcpDacInit();
+  SPImcpDACinit();
 
   qMeasurement = GetQMeasurement();  // Measure Arudino clock frequency 
   Serial.print("Arudino Freq: ");
@@ -344,13 +358,13 @@ Serial.print("\nPitch Set Frequency: ");
 Serial.println(pitchfn);
 
 
-mcpDac2BSend(1600);
+SPImcpDAC2Bsend(1600);
 
-mcpDac2ASend(pitchXn0);
+SPImcpDAC2Asend(pitchXn0);
 delay(100);
 pitchfn0 = GetPitchMeasurement();
 
-mcpDac2ASend(pitchXn1);
+SPImcpDAC2Asend(pitchXn1);
 delay(100);
 pitchfn1 = GetPitchMeasurement();
 
@@ -362,11 +376,11 @@ Serial.println(pitchfn1);
  
 while(abs(pitchfn0-pitchfn1)>CalibrationTolerance){      // max allowed pitch frequency offset
 
-mcpDac2ASend(pitchXn0);
+SPImcpDAC2Asend(pitchXn0);
 delay(100);
 pitchfn0 = GetPitchMeasurement()-pitchfn;
 
-mcpDac2ASend(pitchXn1);
+SPImcpDAC2Asend(pitchXn1);
 delay(100);
 pitchfn1 = GetPitchMeasurement()-pitchfn;
 
@@ -411,7 +425,7 @@ static long volumefn = 0;
     
   InitialiseVolumeMeasurement();
   interrupts();
-  mcpDacInit();
+  SPImcpDACinit();
 
 
 volumeXn0 = 0;
@@ -424,12 +438,12 @@ Serial.print("\nVolume Set Frequency: ");
 Serial.println(volumefn);
 
 
-mcpDac2BSend(volumeXn0);
+SPImcpDAC2Bsend(volumeXn0);
 delay_NOP(44316);//44316=100ms
 
 volumefn0 = GetVolumeMeasurement();
 
-mcpDac2BSend(volumeXn1);
+SPImcpDAC2Bsend(volumeXn1);
 
 delay_NOP(44316);//44316=100ms
 volumefn1 = GetVolumeMeasurement();
@@ -443,11 +457,11 @@ Serial.println(volumefn1);
 
 while(abs(volumefn0-volumefn1)>CalibrationTolerance){
 
-mcpDac2BSend(volumeXn0);
+SPImcpDAC2Bsend(volumeXn0);
 delay_NOP(44316);//44316=100ms
 volumefn0 = GetVolumeMeasurement()-volumefn;
 
-mcpDac2BSend(volumeXn1);
+SPImcpDAC2Bsend(volumeXn1);
 delay_NOP(44316);//44316=100ms
 volumefn1 = GetVolumeMeasurement()-volumefn;
 
@@ -474,7 +488,7 @@ EEPROM.put(2,volumeXn0);
   HW_LED2_OFF;
   HW_LED1_ON;
 
-  Serial.println("\nCALIBRATION COMPTLETED\n");
+  Serial.println("\nCALIBRATION COMPLETED\n");
 }
 
 void Application::hzToAddVal(float hz) {
@@ -482,7 +496,7 @@ void Application::hzToAddVal(float hz) {
 }
 
 void Application::playNote(float hz, uint16_t milliseconds = 500, uint8_t volume = 255) {
-  vScaledVolume = volume;
+  vScaledVolume = volume * (volume + 2);
   hzToAddVal(hz);
   millitimer(milliseconds);
   vScaledVolume = 0;
@@ -512,7 +526,3 @@ void Application::delay_NOP(unsigned long time) {
       __asm__ __volatile__ ("nop");
   }
 }
-
-
-
-

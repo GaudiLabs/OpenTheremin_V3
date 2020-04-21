@@ -1,9 +1,8 @@
 #include "Arduino.h"
 
 #include "ihandlers.h"
-#include "mcpDac.h"
+#include "SPImcpDAC.h"
 #include "timer.h"
-
 #include "build.h"
 
 #include "theremin_sintable.c"
@@ -15,7 +14,7 @@
 #include "theremin_sintable7.c"
 #include "theremin_sintable8.c"
 
-const int16_t* const wavetables[] PROGMEM = {
+const int16_t* const wavetables[] = { //Fixed following a suggestion by Michael Freitas, does not need to be in PROGMEM
   sine_table,
   sine_table2,
   sine_table3,
@@ -26,12 +25,20 @@ const int16_t* const wavetables[] PROGMEM = {
   sine_table8
 };
 
-static const uint32_t MCP_DAC_BASE = 2047;
+static const uint32_t MCP_DAC_BASE = 2048;
 
 #define INT0_STATE    (PIND & (1<<PORTD2))
 #define PC_STATE      (PINB & (1<<PORTB0))
 
-volatile uint8_t  vScaledVolume = 0;
+// Added by ThF 20200419
+// #define TH_DEBUG 			// <-- comment this out for normal operation
+// end
+
+#ifdef TH_DEBUG
+#include "hw.h"
+#endif
+
+volatile uint16_t vScaledVolume = 0;
 volatile uint16_t vPointerIncrement = 0;
 
 volatile uint16_t pitch = 0;            // Pitch value
@@ -97,69 +104,41 @@ void ihInitialiseVolumeMeasurement() //Measurement of variable frequency oscilla
     
   }
 
-/* 16 bit by 8 bit multiplication */
-static inline uint32_t mul_16_8(uint16_t a, uint8_t b)
-{
-  uint32_t product;
-  asm (
-    "mul %A1, %2\n\t"
-    "movw %A0, r0\n\t"
-    "clr %C0\n\t"
-    "clr %D0\n\t"
-    "mul %B1, %2\n\t"
-    "add %B0, r0\n\t"
-    "adc %C0, r1\n\t"
-    "clr r1"
-    :
-    "=&r" (product)
-    :
-    "r" (a), "r" (b));
-  return product;
-}
-
 /* Externaly generated 31250 Hz Interrupt for WAVE generator (32us) */
 ISR (INT1_vect) {
-  // Interrupt takes up a total of max 25 us
+  // Interrupt takes up normally 14us but can take up to 22us when interrupted by another interrupt.
 
-  disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
-  // Enable Interrupts to allow counter 1 interrupts
-  interrupts();
+  // Added by ThF 20200419
+  #ifdef TH_DEBUG
+    HW_LED2_ON;
+  #endif
 
-  int16_t  waveSample;
-  uint32_t scaledSample;
-  uint16_t offset = (uint16_t)(pointer>>6) & 0x3ff;
+  // Latch previously written DAC value:
+  SPImcpDAClatch();
+
+	disableInt1(); // Disable External Interrupt INT1 to avoid recursive interrupts
+	// Enable Interrupts to allow counter 1 interrupts
+	interrupts();
+
+	int16_t waveSample;
+	uint32_t scaledSample = 0;
+	uint16_t offset = (uint16_t)(pointer >> 6) & 0x3ff;
 
 #if CV_ENABLED                                 // Generator for CV output
 
  vPointerIncrement = min(vPointerIncrement, 4095);
- mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
+ mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (5.5 us)
 
 #else   //Play sound
 
-  // Read next wave table value (3.0us)
-  // The slightly odd tactic here is to provide compile-time expressions for the wavetable
-  // positions. Making addr1 the index into the wavtables array breaks the time limit for
-  // the interrupt handler
-  switch (vWavetableSelector) {
-    case 1:  waveSample = (int16_t) pgm_read_word_near(wavetables[1] + offset); break;
-    case 2:  waveSample = (int16_t) pgm_read_word_near(wavetables[2] + offset); break;
-    case 3:  waveSample = (int16_t) pgm_read_word_near(wavetables[3] + offset); break;
-    case 4:  waveSample = (int16_t) pgm_read_word_near(wavetables[4] + offset); break;
-    case 5:  waveSample = (int16_t) pgm_read_word_near(wavetables[5] + offset); break;
-    case 6:  waveSample = (int16_t) pgm_read_word_near(wavetables[6] + offset); break;
-    case 7:  waveSample = (int16_t) pgm_read_word_near(wavetables[7] + offset); break;
-    default: waveSample = (int16_t) pgm_read_word_near(wavetables[0] + offset); break;
-  };
+	// Read next wave table value
+	waveSample = (int16_t)pgm_read_word_near(wavetables[vWavetableSelector] + offset);
 
-  if (waveSample > 0) {                   // multiply 16 bit wave number by 8 bit volume value (11.2us / 5.4us)
-    scaledSample = MCP_DAC_BASE + (mul_16_8(waveSample, vScaledVolume) >> 8);
-  } else {
-    scaledSample = MCP_DAC_BASE - (mul_16_8(-waveSample, vScaledVolume) >> 8);
-  }
+	scaledSample = ((int32_t)waveSample * (uint32_t)vScaledVolume) >> 16; // The compiler optimizes this better than any assembly written by hand !!!
 
-  mcpDacSend(scaledSample);        //Send result to Digital to Analogue Converter (audio out) (9.6 us)
+	SPImcpDACsend(scaledSample + MCP_DAC_BASE); //Send result to Digital to Analogue Converter (audio out) (5.5 us)
 
-  pointer = pointer + vPointerIncrement;    // increment table pointer (ca. 2us)
+	pointer += vPointerIncrement; // increment table pointer
 
 #endif                          //CV play sound
   incrementTimer();               // update 32us timer
@@ -190,6 +169,10 @@ ISR (INT1_vect) {
 
   noInterrupts();
   enableInt1();
+// Added by ThF 20200419
+#ifdef TH_DEBUG
+	HW_LED2_OFF;
+#endif
 }
 
 /* VOLUME read - interrupt service routine for capturing volume counter value */
@@ -216,5 +199,3 @@ ISR(TIMER1_OVF_vect)
 {
   timer_overflow_counter++;
 }
-
-
