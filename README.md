@@ -3,7 +3,7 @@
 Arduino UNO Software for the Open.Theremin
 
 ### Changes since V3.0 (all by @Theremingenieur):
-1. Fix a wavetable addressing issue (found by @michaelfreitas)
+1. Fix a wavetable addressing issue (found by @miguelfreitas)
 2. Use the Arduino's hardware SPI to control the DACS and use the Latch signal to reduce audio jitter
 3. Improve the register switch to transpose by clean octaves and keep the tone spacing and pitch tuning consistent
 4. Improve the volume response to give a smoother start and wider dynamics (*)
