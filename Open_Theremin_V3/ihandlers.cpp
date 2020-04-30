@@ -127,7 +127,7 @@ ISR (INT1_vect) {
 #if CV_ENABLED                                 // Generator for CV output
 
  vPointerIncrement = min(vPointerIncrement, 4095);
- mcpDacSend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (5.5 us)
+ SPImcpDACsend(vPointerIncrement);        //Send result to Digital to Analogue Converter (audio out) (5.5 us)
 
 #else   //Play sound
 
