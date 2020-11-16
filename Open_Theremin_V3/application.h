@@ -33,7 +33,7 @@ class Application {
 
     
 #if SERIAL_ENABLED    
-    static const int BAUD = 115200;
+    static const long BAUD = 115200;
 #endif
 
     AppState _state;
